@@ -21,16 +21,16 @@ public class InstantiatingButton : MonoBehaviour {
     // Use this for initialization
     void Start () {
         userStock = 0;
-        StartCoroutine(StockRefresh(FindObjectOfType<DisplayTime>()));
+        StartCoroutine(StockRefresh(FindObjectOfType<GameTime>()));
             
      
         
 
     }
-    IEnumerator StockRefresh(DisplayTime time) //get a stock every twenty minutes
+    IEnumerator StockRefresh(GameTime time) //get a stock every twenty minutes
     {
         WaitForSeconds waitForSeconds = new WaitForSeconds(time.timeSpeed*20);
-        while (time.hour<time.timeLimit)
+        while (true)
         {
             userStock++;
             yield return waitForSeconds;
