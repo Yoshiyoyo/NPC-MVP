@@ -9,6 +9,7 @@ public class ReissNPCController : MonoBehaviour {
     public string[] categories = { "Food: ", "Exploration: ", "Sleep: ", "Drink: " };
 
     public Text displayText;
+    public GameObject idlePosition;
 
     public float speed;
     public GameObject desire;
@@ -21,8 +22,8 @@ public class ReissNPCController : MonoBehaviour {
     NavMeshAgent agent;
 
     //stuff used for calculating priorities
-    float currWeight;
-    float maxweight;
+    public float currWeight;
+    public float maxweight;
     int maxweightindex;
     float[] testAffordanceDesires;
     float[] postAffordanceDesires;
@@ -30,6 +31,7 @@ public class ReissNPCController : MonoBehaviour {
 
     public float happiness = 100; //time-based progressive value for desires
     public float desireGoal = 1; //desire weight, below generates unhappiness
+    public float attention_Span = 1; //affects rate of happiness changing
     bool inTask = false; //whether or not in the state of applying an affordance, currently not acutally used
 
     public float hunger=75;
@@ -38,7 +40,7 @@ public class ReissNPCController : MonoBehaviour {
     public float thirst=75;
 
     public float farThreshold = 5; //if item is too far, less desire to go to it. this is the threshold
-    Affordances lastAffordanceUsed; //last affordance used has less weight when deciding what afforadance to go to
+    public Affordances lastAffordanceUsed; //last affordance used has less weight when deciding what afforadance to go to
 
     bool flag = false;
 
@@ -49,6 +51,7 @@ public class ReissNPCController : MonoBehaviour {
     public float curiositygrowth;
     public float sleepinessgrowth;
     public float thirstgrowth;
+    
 
     public float[] growths;
 
@@ -91,9 +94,9 @@ public class ReissNPCController : MonoBehaviour {
 
                 //postAffordanceDesires[i] = desires[i];
             }
+            NormalizeDesires(ref desires);
             currWeight = FindDesireWeight(desires);
-            happiness += desireGoal;
-            happiness -= currWeight;
+            happiness += (desireGoal-currWeight)*attention_Span;
             if (happiness > 100)
                 happiness = 100;
             else if (happiness < 0)
@@ -122,13 +125,15 @@ public class ReissNPCController : MonoBehaviour {
         WaitForSeconds waitForSeconds = new WaitForSeconds(time);
         for (; ; )
         {
-            if (happiness>50) //content, no need to decide on anything
+            while (happiness>50) //content, no need to decide on anything
             {
+                agent.SetDestination(idlePosition.transform.position);
                 yield return waitForSeconds;
             }
+            
             inTask = false;
             NormalizeDesires(ref desires);
-            maxweight = currWeight;
+            maxweight = 0;
 
             maxweightindex = -1;
             movement.Set(0, 0, 0);
@@ -136,23 +141,30 @@ public class ReissNPCController : MonoBehaviour {
             weightmatrix = new float[allAffordances.Length];
             for (int i = 0; i < allAffordances.Length; i++) //logic goes here for calculating affordance weight
             {
-                weightmatrix[i] = FindDesireWeight(ApplyAffordance(allAffordances[i])); //see weight after applying affordance
-                movement = transform.position - allAffordances[i].transform.position;
-                if (movement.magnitude > farThreshold) //if too far, apply a penalty, to be slightly complicated further in future
-                    weightmatrix[i] /= 2;
-                if (allAffordances[i] == lastAffordanceUsed) //if last affordance used, apply a penalty, to be a buffer of N affordances in the future
-                    weightmatrix[i] /= 2;
-
-
-                if (maxweight > weightmatrix[i])
+                weightmatrix[i] = currWeight-FindDesireWeight(ApplyAffordance(allAffordances[i])); //see weight after applying affordance
+               
+                if (weightmatrix[i] >0)
                 {
-                    maxweight = weightmatrix[i];
-                    maxweightindex = i;
-                    //desireAffordance
+                   
+                    movement = transform.position - allAffordances[i].transform.position;
+                    if (movement.magnitude > farThreshold) //if too far, apply a penalty, to be slightly complicated further in future
+                        weightmatrix[i] /= 2;
+                    if (allAffordances[i] == lastAffordanceUsed) //if last affordance used, apply a penalty, to be a buffer of N affordances in the future
+                        weightmatrix[i] /= 4;
+
+                    Debug.Log(maxweight + " " + weightmatrix[i]);
+
+
+                    if (maxweight <weightmatrix[i])
+                    {
+                        maxweight = weightmatrix[i];
+                        maxweightindex = i;
+                        //desireAffordance
+                    }
                 }
             }
             //Debug.Log(maxweight + " " + currWeight);
-            if (maxweight < currWeight) //if there is a affordance desired, work towards it
+            if (maxweightindex>-1) //if there is a affordance desired, work towards it
             {
 
                 //Debug.Log(maxweight);
@@ -162,7 +174,7 @@ public class ReissNPCController : MonoBehaviour {
                 movement = transform.position - desire.transform.position;
 
                 //afterwards, check if need to apply affordance, at the moment just sees if its a specific distance away
-                
+                Debug.Log(movement.magnitude);
                 if (movement.magnitude < 1)
                 {
 
